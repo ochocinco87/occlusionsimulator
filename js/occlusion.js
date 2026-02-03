@@ -21,6 +21,8 @@ const OcclusionDetector = {
      * @returns {Object} Analysis results
      */
     analyze(config) {
+        console.log('OcclusionDetector.analyze called with config:', config);
+
         const {
             cameraType,
             cameraPosition,
@@ -32,7 +34,10 @@ const OcclusionDetector = {
         } = config;
 
         const camera = getCameraSpecs(cameraType);
+        console.log('Camera specs:', camera);
+
         const cameraDir = Geometry.getCameraDirection(cameraTilt);
+        console.log('Camera direction:', cameraDir);
 
         // Generate array geometries
         const baseGeometry = Geometry.generateArrayGeometry(arraySpacing, sphereDiameter);

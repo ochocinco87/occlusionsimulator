@@ -43,20 +43,49 @@ const Renderer = {
      * Initialize renderer with canvas elements
      */
     init(topCanvasId, sideCanvasId) {
+        console.log('Renderer init called');
         this.topCanvas = document.getElementById(topCanvasId);
         this.sideCanvas = document.getElementById(sideCanvasId);
 
+        console.log('Found canvases:', this.topCanvas, this.sideCanvas);
+
         // Set fixed canvas dimensions
         if (this.topCanvas) {
-            this.topCanvas.width = 500;
+            this.topCanvas.width = 600;
             this.topCanvas.height = 400;
             this.topCtx = this.topCanvas.getContext('2d');
+            console.log('Top canvas context:', this.topCtx);
+
+            // Test draw
+            this.topCtx.fillStyle = '#1e293b';
+            this.topCtx.fillRect(0, 0, 600, 400);
+            this.topCtx.fillStyle = '#22c55e';
+            this.topCtx.beginPath();
+            this.topCtx.arc(300, 200, 20, 0, Math.PI * 2);
+            this.topCtx.fill();
+            this.topCtx.fillStyle = '#fff';
+            this.topCtx.font = '14px sans-serif';
+            this.topCtx.textAlign = 'center';
+            this.topCtx.fillText('Canvas initialized...', 300, 250);
         }
 
         if (this.sideCanvas) {
-            this.sideCanvas.width = 500;
+            this.sideCanvas.width = 600;
             this.sideCanvas.height = 400;
             this.sideCtx = this.sideCanvas.getContext('2d');
+            console.log('Side canvas context:', this.sideCtx);
+
+            // Test draw
+            this.sideCtx.fillStyle = '#1e293b';
+            this.sideCtx.fillRect(0, 0, 600, 400);
+            this.sideCtx.fillStyle = '#3b82f6';
+            this.sideCtx.beginPath();
+            this.sideCtx.arc(300, 200, 20, 0, Math.PI * 2);
+            this.sideCtx.fill();
+            this.sideCtx.fillStyle = '#fff';
+            this.sideCtx.font = '14px sans-serif';
+            this.sideCtx.textAlign = 'center';
+            this.sideCtx.fillText('Canvas initialized...', 300, 250);
         }
 
         // Handle resize
@@ -89,8 +118,21 @@ const Renderer = {
      * Render all views
      */
     render(analysisResults, config) {
-        this.renderTopView(analysisResults, config);
-        this.renderSideView(analysisResults, config);
+        console.log('Render called', { analysisResults, config });
+        console.log('Top canvas:', this.topCanvas, 'ctx:', this.topCtx);
+        console.log('Side canvas:', this.sideCanvas, 'ctx:', this.sideCtx);
+
+        try {
+            this.renderTopView(analysisResults, config);
+        } catch (e) {
+            console.error('Top view render error:', e);
+        }
+
+        try {
+            this.renderSideView(analysisResults, config);
+        } catch (e) {
+            console.error('Side view render error:', e);
+        }
     },
 
     /**

@@ -180,23 +180,59 @@ const App = {
      * Run occlusion analysis and update display
      */
     updateAnalysis() {
-        // Convert state to analysis config
-        const config = this.buildAnalysisConfig();
+        try {
+            // Convert state to analysis config
+            const config = this.buildAnalysisConfig();
 
-        // Run analysis
-        this.analysisResults = OcclusionDetector.analyze(config);
+            // Run analysis
+            this.analysisResults = OcclusionDetector.analyze(config);
 
-        // Render views
-        Renderer.render(this.analysisResults, {
-            cameraHeight: this.state.cameraHeight,
-            cameraDistance: this.state.cameraDistance,
-            cameraTilt: this.state.cameraTilt,
-            bedHeight: this.state.bedHeight,
-            bedLength: this.state.bedLength
-        });
+            // Render views
+            const renderConfig = {
+                cameraHeight: this.state.cameraHeight,
+                cameraDistance: this.state.cameraDistance,
+                cameraTilt: this.state.cameraTilt,
+                bedHeight: this.state.bedHeight,
+                bedLength: this.state.bedLength
+            };
 
-        // Update results panel
-        this.updateResultsPanel();
+            Renderer.render(this.analysisResults, renderConfig);
+
+            // Update results panel
+            this.updateResultsPanel();
+        } catch (error) {
+            console.error('Analysis error:', error);
+            // Still try to render something
+            this.renderFallback();
+        }
+    },
+
+    /**
+     * Render a fallback visualization if analysis fails
+     */
+    renderFallback() {
+        const topCanvas = document.getElementById('top-view-canvas');
+        const sideCanvas = document.getElementById('side-view-canvas');
+
+        if (topCanvas) {
+            const ctx = topCanvas.getContext('2d');
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, topCanvas.width, topCanvas.height);
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Error - Check console', topCanvas.width/2, topCanvas.height/2);
+        }
+
+        if (sideCanvas) {
+            const ctx = sideCanvas.getContext('2d');
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, sideCanvas.width, sideCanvas.height);
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Error - Check console', sideCanvas.width/2, sideCanvas.height/2);
+        }
     },
 
     /**
