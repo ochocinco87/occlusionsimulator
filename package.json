@@ -1,0 +1,25 @@
+{
+  "name": "ir-occlusion-simulator",
+  "version": "1.0.0",
+  "description": "IR Retroreflector Sphere Occlusion Simulator for SpryTrak 300 and FusionTrack 500 cameras",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx live-server --port=3000"
+  },
+  "keywords": [
+    "optical-tracking",
+    "atracsys",
+    "sprytrack",
+    "fusiontrack",
+    "surgical-navigation",
+    "occlusion-detection",
+    "retroreflector"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "serve": "^14.2.0"
+  }
+}
