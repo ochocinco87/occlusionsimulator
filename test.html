@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IR Occlusion Simulator - Simple Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 20px; }
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .panel {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        .panel h2 { font-size: 14px; margin-bottom: 10px; color: #94a3b8; }
+        canvas {
+            display: block;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 4px;
+        }
+        .controls {
+            width: 280px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: block;
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+        .control-group input[type="range"] {
+            width: 100%;
+        }
+        .control-group select {
+            width: 100%;
+            padding: 8px;
+            background: #0f172a;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f172a;
+            border-radius: 4px;
+        }
+        .status.ok { border-left: 4px solid #22c55e; }
+        .status.warning { border-left: 4px solid #f59e0b; }
+        .status.error { border-left: 4px solid #ef4444; }
+        .sphere-info { display: flex; gap: 10px; margin-top: 10px; }
+        .sphere {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .sphere.visible { background: #22c55e; }
+        .sphere.occluded { background: #ef4444; }
+        .sphere.out-of-range { background: #6b7280; }
+    </style>
+</head>
+<body>
+    <h1>IR Occlusion Simulator - Test Version</h1>
+
+    <div class="container">
+        <div class="panel controls">
+            <h2>Camera Settings</h2>
+            <div class="control-group">
+                <label>Camera Model</label>
+                <select id="camera-type">
+                    <option value="sprytrack300">SpryTrak 300 (range: 0.3-1.4m)</option>
+                    <option value="fusiontrack500">FusionTrack 500 (range: 0.7-2.8m)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Camera Height: <span id="cam-h-val">8.0</span> ft</label>
+                <input type="range" id="cam-height" min="6" max="10" step="0.1" value="8">
+            </div>
+            <div class="control-group">
+                <label>Camera Distance: <span id="cam-d-val">6.0</span> ft</label>
+                <input type="range" id="cam-dist" min="3" max="12" step="0.1" value="6">
+            </div>
+            <div class="control-group">
+                <label>Camera Tilt: <span id="cam-t-val">-25</span>&deg;</label>
+                <input type="range" id="cam-tilt" min="-60" max="0" step="1" value="-25">
+            </div>
+
+            <h2 style="margin-top:20px">Bed Settings</h2>
+            <div class="control-group">
+                <label>Bed Height: <span id="bed-h-val">2.5</span> ft</label>
+                <input type="range" id="bed-height" min="1.5" max="4" step="0.1" value="2.5">
+            </div>
+
+            <h2 style="margin-top:20px">Reference Array (Green)</h2>
+            <div class="control-group">
+                <label>Y Position: <span id="ref-y-val">3.0</span> ft</label>
+                <input type="range" id="ref-y" min="0" max="6" step="0.1" value="3">
+            </div>
+            <div class="control-group">
+                <label>Height Above Bed: <span id="ref-z-val">0.5</span> ft</label>
+                <input type="range" id="ref-z" min="0" max="2" step="0.1" value="0.5">
+            </div>
+
+            <h2 style="margin-top:20px">Navigation Array (Blue)</h2>
+            <div class="control-group">
+                <label>Y Position: <span id="nav-y-val">2.5</span> ft</label>
+                <input type="range" id="nav-y" min="0" max="6" step="0.1" value="2.5">
+            </div>
+            <div class="control-group">
+                <label>Height Above Bed: <span id="nav-z-val">1.0</span> ft</label>
+                <input type="range" id="nav-z" min="0" max="3" step="0.1" value="1">
+            </div>
+
+            <div class="status ok" id="status">
+                <strong>Status:</strong> <span id="status-text">Initializing...</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Top View (Looking Down)</h2>
+            <canvas id="top-canvas" width="500" height="400"></canvas>
+        </div>
+
+        <div class="panel">
+            <h2>Side View</h2>
+            <canvas id="side-canvas" width="500" height="400"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Simple self-contained version for testing
+
+        const FEET_TO_METERS = 0.3048;
+        const METERS_TO_FEET = 3.28084;
+
+        // Camera specs
+        const cameras = {
+            sprytrack300: {
+                name: 'SpryTrak 300',
+                fov: { h: 42, v: 32 },
+                minRange: 0.3,
+                maxRange: 1.4
+            },
+            fusiontrack500: {
+                name: 'FusionTrack 500',
+                fov: { h: 55, v: 38 },
+                minRange: 0.7,
+                maxRange: 2.8
+            }
+        };
+
+        // State
+        const state = {
+            camera: 'sprytrack300',
+            camHeight: 8.0,
+            camDist: 6.0,
+            camTilt: -25,
+            bedHeight: 2.5,
+            refY: 3.0,
+            refZ: 0.5,
+            navY: 2.5,
+            navZ: 1.0
+        };
+
+        // Get canvas contexts
+        const topCanvas = document.getElementById('top-canvas');
+        const sideCanvas = document.getElementById('side-canvas');
+        const topCtx = topCanvas.getContext('2d');
+        const sideCtx = sideCanvas.getContext('2d');
+
+        // Setup controls
+        function setupControls() {
+            const controls = [
+                ['cam-height', 'camHeight', 'cam-h-val'],
+                ['cam-dist', 'camDist', 'cam-d-val'],
+                ['cam-tilt', 'camTilt', 'cam-t-val'],
+                ['bed-height', 'bedHeight', 'bed-h-val'],
+                ['ref-y', 'refY', 'ref-y-val'],
+                ['ref-z', 'refZ', 'ref-z-val'],
+                ['nav-y', 'navY', 'nav-y-val'],
+                ['nav-z', 'navZ', 'nav-z-val']
+            ];
+
+            controls.forEach(([inputId, stateKey, displayId]) => {
+                const input = document.getElementById(inputId);
+                const display = document.getElementById(displayId);
+                input.addEventListener('input', (e) => {
+                    state[stateKey] = parseFloat(e.target.value);
+                    display.textContent = e.target.value;
+                    render();
+                });
+            });
+
+            document.getElementById('camera-type').addEventListener('change', (e) => {
+                state.camera = e.target.value;
+                render();
+            });
+        }
+
+        // Calculate positions in meters
+        function getPositions() {
+            const camPos = {
+                x: 0,
+                y: 0,
+                z: state.camHeight * FEET_TO_METERS
+            };
+
+            const refPos = {
+                x: 0,
+                y: (state.camDist + state.refY) * FEET_TO_METERS,
+                z: (state.bedHeight + state.refZ) * FEET_TO_METERS
+            };
+
+            const navPos = {
+                x: 0,
+                y: (state.camDist + state.navY) * FEET_TO_METERS,
+                z: (state.bedHeight + state.navZ) * FEET_TO_METERS
+            };
+
+            return { camPos, refPos, navPos };
+        }
+
+        // Calculate distance
+        function distance(p1, p2) {
+            return Math.sqrt(
+                Math.pow(p2.x - p1.x, 2) +
+                Math.pow(p2.y - p1.y, 2) +
+                Math.pow(p2.z - p1.z, 2)
+            );
+        }
+
+        // Check if in range
+        function checkRange(dist, cam) {
+            return dist >= cam.minRange && dist <= cam.maxRange;
+        }
+
+        // Render top view
+        function renderTopView() {
+            const ctx = topCtx;
+            const w = topCanvas.width;
+            const h = topCanvas.height;
+            const scale = 40; // pixels per foot
+            const centerX = w / 2;
+            const centerY = h * 0.75;
+
+            // Clear
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw bed
+            const bedW = 2.5 * scale;
+            const bedL = 6.5 * scale;
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(centerX - bedW/2, centerY - bedL, bedW, bedL);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(centerX - bedW/2, centerY - bedL, bedW, bedL);
+
+            // Bed labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('HEAD', centerX, centerY - bedL + 15);
+            ctx.fillText('FOOT', centerX, centerY - 10);
+
+            // Draw camera FOV
+            const cam = cameras[state.camera];
+            const maxRange = Math.min(cam.maxRange, 4) * METERS_TO_FEET * scale;
+            const halfAngle = (cam.fov.h / 2) * Math.PI / 180;
+
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX - maxRange * Math.tan(halfAngle), centerY - maxRange);
+            ctx.lineTo(centerX + maxRange * Math.tan(halfAngle), centerY - maxRange);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX - maxRange * Math.tan(halfAngle), centerY - maxRange);
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + maxRange * Math.tan(halfAngle), centerY - maxRange);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw arrays (4 spheres each in square pattern)
+            const { camPos, refPos, navPos } = getPositions();
+            const refDist = distance(camPos, refPos);
+            const navDist = distance(camPos, navPos);
+            const refInRange = checkRange(refDist, cam);
+            const navInRange = checkRange(navDist, cam);
+
+            // Reference array (green)
+            const refScreenY = centerY - state.refY * scale - state.camDist * scale;
+            drawArray(ctx, centerX, refScreenY, '#22c55e', refInRange, 'REF');
+
+            // Navigation array (blue)
+            const navScreenY = centerY - state.navY * scale - state.camDist * scale;
+            drawArray(ctx, centerX, navScreenY, '#3b82f6', navInRange, 'NAV');
+
+            // Draw camera
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.rect(centerX - 12, centerY - 8, 24, 16);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText('CAM', centerX, centerY + 25);
+
+            // Update status
+            updateStatus(refDist, navDist, refInRange, navInRange, cam);
+        }
+
+        // Draw 4-sphere array
+        function drawArray(ctx, cx, cy, color, inRange, label) {
+            const spacing = 15; // pixels
+            const spherePositions = [
+                { x: cx - spacing, y: cy - spacing },
+                { x: cx + spacing, y: cy - spacing },
+                { x: cx + spacing, y: cy + spacing },
+                { x: cx - spacing, y: cy + spacing }
+            ];
+
+            // Draw mounting plate (occluded zone)
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.fillRect(cx - spacing, cy - spacing, spacing * 2, spacing * 2);
+            ctx.strokeRect(cx - spacing, cy - spacing, spacing * 2, spacing * 2);
+
+            // Draw X on plate
+            ctx.beginPath();
+            ctx.moveTo(cx - spacing, cy - spacing);
+            ctx.lineTo(cx + spacing, cy + spacing);
+            ctx.moveTo(cx + spacing, cy - spacing);
+            ctx.lineTo(cx - spacing, cy + spacing);
+            ctx.stroke();
+
+            // Draw spheres
+            const fillColor = inRange ? color : '#6b7280';
+            spherePositions.forEach((pos, i) => {
+                // Glow
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+                ctx.fillStyle = fillColor + '40';
+                ctx.fill();
+
+                // Sphere
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 9, 0, Math.PI * 2);
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Number
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText((i + 1).toString(), pos.x, pos.y);
+            });
+
+            // Label
+            ctx.fillStyle = fillColor;
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(label, cx, cy + spacing + 15);
+        }
+
+        // Render side view
+        function renderSideView() {
+            const ctx = sideCtx;
+            const w = sideCanvas.width;
+            const h = sideCanvas.height;
+            const scale = 35;
+            const groundY = h * 0.85;
+            const camX = 60;
+
+            // Clear
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(w, groundY);
+            ctx.stroke();
+
+            // Camera FOV
+            const cam = cameras[state.camera];
+            const camHeight = state.camHeight * scale;
+            const camY = groundY - camHeight;
+            const maxRange = Math.min(cam.maxRange, 4) * METERS_TO_FEET * scale;
+            const tiltRad = state.camTilt * Math.PI / 180;
+            const halfAngle = cam.fov.v / 2 * Math.PI / 180;
+
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(camX, camY);
+            ctx.lineTo(camX + maxRange * Math.cos(tiltRad + halfAngle), camY - maxRange * Math.sin(tiltRad + halfAngle));
+            ctx.lineTo(camX + maxRange * Math.cos(tiltRad - halfAngle), camY - maxRange * Math.sin(tiltRad - halfAngle));
+            ctx.closePath();
+            ctx.fill();
+
+            // Camera pole
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(camX, groundY);
+            ctx.lineTo(camX, camY);
+            ctx.stroke();
+
+            // Camera body
+            ctx.save();
+            ctx.translate(camX, camY);
+            ctx.rotate(-tiltRad);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(0, -8, 25, 16);
+            ctx.restore();
+
+            // Bed
+            const bedHeight = state.bedHeight * scale;
+            const bedStart = camX + state.camDist * scale;
+            const bedLen = 6.5 * scale;
+
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(bedStart, groundY - bedHeight - 10, bedLen, 10);
+            ctx.strokeStyle = '#64748b';
+            ctx.strokeRect(bedStart, groundY - bedHeight - 10, bedLen, 10);
+
+            // Bed legs
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(bedStart, groundY - bedHeight, 4, bedHeight);
+            ctx.fillRect(bedStart + bedLen - 4, groundY - bedHeight, 4, bedHeight);
+
+            // Reference array
+            const refScreenX = bedStart + state.refY * scale;
+            const refScreenY = groundY - bedHeight - 10 - state.refZ * scale;
+            drawArraySide(ctx, refScreenX, refScreenY, '#22c55e', 'REF');
+
+            // Navigation array
+            const navScreenX = bedStart + state.navY * scale;
+            const navScreenY = groundY - bedHeight - 10 - state.navZ * scale;
+            drawArraySide(ctx, navScreenX, navScreenY, '#3b82f6', 'NAV');
+
+            // Labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('FOOT', bedStart, groundY + 15);
+            ctx.fillText('HEAD', bedStart + bedLen - 30, groundY + 15);
+            ctx.fillText(state.camHeight.toFixed(1) + ' ft', camX + 10, camY);
+        }
+
+        // Draw array in side view
+        function drawArraySide(ctx, cx, cy, color, label) {
+            const spacing = 10;
+
+            // Mounting plate
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(cx - spacing, cy);
+            ctx.lineTo(cx + spacing, cy);
+            ctx.stroke();
+
+            // Spheres (show 2 from side - front and back overlap)
+            [-spacing, spacing].forEach((offset, i) => {
+                ctx.beginPath();
+                ctx.arc(cx + offset, cy, 7, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+
+            // Label
+            ctx.fillStyle = color;
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, cx, cy - 15);
+        }
+
+        // Update status display
+        function updateStatus(refDist, navDist, refInRange, navInRange, cam) {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+
+            let status = 'ok';
+            let text = 'All arrays visible';
+
+            if (!refInRange || !navInRange) {
+                status = 'error';
+                const issues = [];
+                if (!refInRange) issues.push(`REF at ${refDist.toFixed(2)}m (range: ${cam.minRange}-${cam.maxRange}m)`);
+                if (!navInRange) issues.push(`NAV at ${navDist.toFixed(2)}m (range: ${cam.minRange}-${cam.maxRange}m)`);
+                text = 'Out of range: ' + issues.join(', ');
+            } else {
+                text = `REF: ${refDist.toFixed(2)}m, NAV: ${navDist.toFixed(2)}m - All 8 spheres visible`;
+            }
+
+            statusEl.className = 'status ' + status;
+            statusText.textContent = text;
+        }
+
+        // Main render function
+        function render() {
+            renderTopView();
+            renderSideView();
+        }
+
+        // Initialize
+        setupControls();
+        render();
+
+        console.log('Simple test version initialized successfully');
+    </script>
+</body>
+</html>
