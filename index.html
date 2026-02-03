@@ -11,6 +11,7 @@
         <header class="app-header">
             <h1>IR Retroreflector Occlusion Simulator</h1>
             <p class="subtitle">Atracsys Optical Tracking Camera Visibility Analysis</p>
+            <p class="help-text">Each array has 4 retroreflector spheres in a square pattern. The area between the spheres (mounting plate) blocks IR light. Adjust camera and array positions to ensure all spheres are visible.</p>
         </header>
 
         <main class="main-content">
@@ -114,6 +115,19 @@
 
                 <section class="control-section">
                     <h2>Array Configuration</h2>
+                    <!-- Visual diagram of 4-ball array -->
+                    <div class="array-diagram">
+                        <div class="array-diagram-title">4-Ball Array Pattern:</div>
+                        <div class="array-visual">
+                            <div class="sphere-grid">
+                                <span class="diagram-sphere">1</span>
+                                <span class="diagram-sphere">2</span>
+                                <span class="diagram-plate">PLATE<br>(occluded)</span>
+                                <span class="diagram-sphere">4</span>
+                                <span class="diagram-sphere">3</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="control-group">
                         <label for="sphere-diameter">Sphere Diameter: <span id="sphere-diameter-value">12.7</span> mm</label>
                         <input type="range" id="sphere-diameter" min="6" max="20" step="0.5" value="12.7">

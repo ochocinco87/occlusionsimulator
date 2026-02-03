@@ -46,44 +46,43 @@ const Renderer = {
         this.topCanvas = document.getElementById(topCanvasId);
         this.sideCanvas = document.getElementById(sideCanvasId);
 
+        // Set fixed canvas dimensions
         if (this.topCanvas) {
+            this.topCanvas.width = 500;
+            this.topCanvas.height = 400;
             this.topCtx = this.topCanvas.getContext('2d');
-            this.setupCanvas(this.topCanvas);
         }
 
         if (this.sideCanvas) {
+            this.sideCanvas.width = 500;
+            this.sideCanvas.height = 400;
             this.sideCtx = this.sideCanvas.getContext('2d');
-            this.setupCanvas(this.sideCanvas);
         }
 
         // Handle resize
         window.addEventListener('resize', () => this.handleResize());
-        this.handleResize();
     },
 
     /**
-     * Setup canvas for high DPI displays
-     */
-    setupCanvas(canvas) {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-
-        const ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-
-        canvas.style.width = rect.width + 'px';
-        canvas.style.height = rect.height + 'px';
-    },
-
-    /**
-     * Handle window resize
+     * Handle window resize - recalculate canvas sizes
      */
     handleResize() {
-        if (this.topCanvas) this.setupCanvas(this.topCanvas);
-        if (this.sideCanvas) this.setupCanvas(this.sideCanvas);
+        if (this.topCanvas) {
+            const parent = this.topCanvas.parentElement;
+            if (parent) {
+                const rect = parent.getBoundingClientRect();
+                this.topCanvas.width = Math.max(400, rect.width - 40);
+                this.topCanvas.height = 350;
+            }
+        }
+        if (this.sideCanvas) {
+            const parent = this.sideCanvas.parentElement;
+            if (parent) {
+                const rect = parent.getBoundingClientRect();
+                this.sideCanvas.width = Math.max(400, rect.width - 40);
+                this.sideCanvas.height = 350;
+            }
+        }
     },
 
     /**
@@ -102,9 +101,8 @@ const Renderer = {
         const canvas = this.topCanvas;
         if (!ctx || !canvas) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
+        const width = canvas.width;
+        const height = canvas.height;
 
         // Clear canvas
         ctx.fillStyle = this.colors.background;
@@ -143,9 +141,8 @@ const Renderer = {
         const canvas = this.sideCanvas;
         if (!ctx || !canvas) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
+        const width = canvas.width;
+        const height = canvas.height;
 
         // Clear canvas
         ctx.fillStyle = this.colors.background;
@@ -388,53 +385,75 @@ const Renderer = {
     },
 
     /**
-     * Draw array in top view
+     * Draw array in top view - shows 4 spheres in square pattern with mounting plate
      */
     drawArrayTopView(ctx, arrayAnalysis, type, scale, centerX, centerY) {
         const array = arrayAnalysis.transformed;
         const baseColor = type === 'reference' ? this.colors.reference : this.colors.navigation;
         const occludedColor = type === 'reference' ? this.colors.referenceOccluded : this.colors.navigationOccluded;
 
-        // Draw occluded zone (mounting plate)
-        const plateSize = array.occludedZone.width * Geometry.METERS_TO_FEET * scale;
+        // Calculate plate center in screen coords
         const plateCenterX = centerX + array.position.x * Geometry.METERS_TO_FEET * scale;
         const plateCenterY = centerY - array.position.y * Geometry.METERS_TO_FEET * scale;
 
+        // Make plate size visible (minimum 30 pixels)
+        const plateSize = Math.max(array.occludedZone.width * Geometry.METERS_TO_FEET * scale, 30);
+
+        // Draw occluded zone (mounting plate) - the square area between spheres
         ctx.save();
         ctx.translate(plateCenterX, plateCenterY);
         ctx.rotate(-Geometry.degToRad(array.rotation.yaw));
 
+        // Draw mounting plate background
         ctx.fillStyle = this.colors.occlusion;
         ctx.strokeStyle = this.colors.occlusionBorder;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2;
         ctx.fillRect(-plateSize / 2, -plateSize / 2, plateSize, plateSize);
         ctx.strokeRect(-plateSize / 2, -plateSize / 2, plateSize, plateSize);
 
+        // Draw diagonal lines to show it's occluded
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-plateSize / 2, -plateSize / 2);
+        ctx.lineTo(plateSize / 2, plateSize / 2);
+        ctx.moveTo(plateSize / 2, -plateSize / 2);
+        ctx.lineTo(-plateSize / 2, plateSize / 2);
+        ctx.stroke();
+
         ctx.restore();
 
-        // Draw spheres
+        // Draw the 4 spheres
+        const sphereRadius = 10; // Fixed visible size for spheres
+
         arrayAnalysis.spheres.forEach((sphere, idx) => {
             const screenX = centerX + sphere.position.x * Geometry.METERS_TO_FEET * scale;
             const screenY = centerY - sphere.position.y * Geometry.METERS_TO_FEET * scale;
-            const radius = array.sphereRadius * Geometry.METERS_TO_FEET * scale * 10; // Exaggerate for visibility
 
             // Determine color based on status
             let fillColor = baseColor;
-            let strokeColor = baseColor;
+            let strokeColor = '#ffffff';
 
             if (sphere.status === 'occluded') {
-                fillColor = occludedColor;
-                strokeColor = this.colors.occlusion;
+                fillColor = this.colors.occlusion;
+                strokeColor = '#ff0000';
             } else if (sphere.status === 'partial') {
                 fillColor = this.colors.warning;
+                strokeColor = '#ffffff';
             } else if (sphere.status === 'out-of-range' || sphere.status === 'out-of-fov') {
                 fillColor = this.colors.outOfRange;
-                strokeColor = this.colors.outOfRange;
+                strokeColor = '#666666';
             }
+
+            // Draw sphere glow
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, sphereRadius + 3, 0, Math.PI * 2);
+            ctx.fillStyle = fillColor + '40';
+            ctx.fill();
 
             // Draw sphere
             ctx.beginPath();
-            ctx.arc(screenX, screenY, Math.max(radius, 6), 0, Math.PI * 2);
+            ctx.arc(screenX, screenY, sphereRadius, 0, Math.PI * 2);
             ctx.fillStyle = fillColor;
             ctx.fill();
             ctx.strokeStyle = strokeColor;
@@ -442,84 +461,99 @@ const Renderer = {
             ctx.stroke();
 
             // Draw sphere number
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(sphere.number.toString(), screenX, screenY);
         });
 
-        // Draw array label
+        // Draw array label below
         ctx.fillStyle = baseColor;
-        ctx.font = 'bold 11px sans-serif';
+        ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'center';
-        const labelY = plateCenterY + plateSize / 2 + 15;
-        ctx.fillText(type === 'reference' ? 'REF' : 'NAV', plateCenterX, labelY);
+        const labelY = plateCenterY + plateSize / 2 + 20;
+        ctx.fillText(type === 'reference' ? 'REF ARRAY' : 'NAV ARRAY', plateCenterX, labelY);
     },
 
     /**
-     * Draw array in side view
+     * Draw array in side view - shows spheres and mounting plate from the side
      */
     drawArraySideView(ctx, arrayAnalysis, type, scale, centerX, groundY) {
         const array = arrayAnalysis.transformed;
         const baseColor = type === 'reference' ? this.colors.reference : this.colors.navigation;
-        const occludedColor = type === 'reference' ? this.colors.referenceOccluded : this.colors.navigationOccluded;
 
-        // Calculate screen position
+        // Calculate screen position of array center
         const arrayY = array.position.y * Geometry.METERS_TO_FEET * scale;
         const arrayZ = array.position.z * Geometry.METERS_TO_FEET * scale;
         const screenX = centerX + arrayY;
         const screenY = groundY - arrayZ;
 
-        // Draw mounting plate (side view - as a line)
-        const plateSize = array.occludedZone.width * Geometry.METERS_TO_FEET * scale;
+        // Draw mounting plate (side view - as a thick line representing the plate edge)
+        const plateSize = Math.max(array.occludedZone.width * Geometry.METERS_TO_FEET * scale, 25);
 
         ctx.save();
         ctx.translate(screenX, screenY);
         ctx.rotate(Geometry.degToRad(array.rotation.pitch));
 
+        // Draw plate edge
         ctx.fillStyle = this.colors.occlusion;
         ctx.strokeStyle = this.colors.occlusionBorder;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(-plateSize / 2, 0);
         ctx.lineTo(plateSize / 2, 0);
         ctx.stroke();
 
+        // Draw plate thickness
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+        ctx.fillRect(-plateSize / 2, -3, plateSize, 6);
+
         ctx.restore();
 
-        // Draw spheres
+        // Draw the 4 spheres (from side view, some may overlap)
+        const sphereRadius = 8;
+
         arrayAnalysis.spheres.forEach((sphere, idx) => {
             const sphereY = sphere.position.y * Geometry.METERS_TO_FEET * scale;
             const sphereZ = sphere.position.z * Geometry.METERS_TO_FEET * scale;
             const sphereScreenX = centerX + sphereY;
             const sphereScreenY = groundY - sphereZ;
-            const radius = array.sphereRadius * Geometry.METERS_TO_FEET * scale * 10;
 
             // Determine color
             let fillColor = baseColor;
+            let strokeColor = '#ffffff';
             if (sphere.status === 'occluded') {
-                fillColor = occludedColor;
+                fillColor = this.colors.occlusion;
+                strokeColor = '#ff0000';
             } else if (sphere.status === 'partial') {
                 fillColor = this.colors.warning;
             } else if (sphere.status === 'out-of-range' || sphere.status === 'out-of-fov') {
                 fillColor = this.colors.outOfRange;
+                strokeColor = '#666666';
             }
 
+            // Draw sphere glow
             ctx.beginPath();
-            ctx.arc(sphereScreenX, sphereScreenY, Math.max(radius, 5), 0, Math.PI * 2);
+            ctx.arc(sphereScreenX, sphereScreenY, sphereRadius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = fillColor + '40';
+            ctx.fill();
+
+            // Draw sphere
+            ctx.beginPath();
+            ctx.arc(sphereScreenX, sphereScreenY, sphereRadius, 0, Math.PI * 2);
             ctx.fillStyle = fillColor;
             ctx.fill();
-            ctx.strokeStyle = baseColor;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2;
             ctx.stroke();
         });
 
-        // Draw label
+        // Draw label above
         ctx.fillStyle = baseColor;
-        ctx.font = 'bold 10px sans-serif';
+        ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(type === 'reference' ? 'REF' : 'NAV', screenX, screenY - 15);
+        ctx.fillText(type === 'reference' ? 'REF' : 'NAV', screenX, screenY - 20);
     },
 
     /**

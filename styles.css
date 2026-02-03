@@ -55,6 +55,13 @@ body {
     font-size: 0.9rem;
 }
 
+.app-header .help-text {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.8rem;
+    max-width: 800px;
+    margin: 0.5rem auto 0;
+}
+
 .main-content {
     display: flex;
     flex: 1;
@@ -178,6 +185,65 @@ body {
     font-weight: 500;
 }
 
+/* Array Diagram */
+.array-diagram {
+    background: var(--bg-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.array-diagram-title {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.array-visual {
+    display: flex;
+    justify-content: center;
+}
+
+.sphere-grid {
+    display: grid;
+    grid-template-columns: 30px 40px 30px;
+    grid-template-rows: 30px 40px 30px;
+    gap: 2px;
+    align-items: center;
+    justify-items: center;
+}
+
+.diagram-sphere {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--reference-color);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 6px var(--reference-color);
+}
+
+.diagram-plate {
+    grid-column: 2;
+    grid-row: 2;
+    width: 36px;
+    height: 36px;
+    background: rgba(239, 68, 68, 0.3);
+    border: 1px dashed var(--danger-color);
+    border-radius: 2px;
+    font-size: 7px;
+    color: var(--danger-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+}
+
 .reset-button {
     width: 100%;
     padding: 0.75rem;
@@ -226,8 +292,10 @@ body {
 .view-panel canvas {
     width: 100%;
     height: 350px;
+    max-width: 100%;
     background: var(--bg-color);
     border-radius: 4px;
+    border: 1px solid var(--panel-border);
     display: block;
 }
 
